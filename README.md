@@ -74,9 +74,9 @@ FROM (SELECT country
 		    LEFT JOIN categories
 		   		ON products.category_id = categories.category_id
 			WHERE country = (SELECT country
-							 FROM (SELECT country
-								  		  , RANK() OVER(ORDER BY SUM((1 - discount) * order_details.unit_price * quantity) DESC) AS country_revenue_ranking
-								   FROM order_details 
+FROM (SELECT country,
+RANK() OVER(ORDER BY SUM((1 - discount) * order_details.unit_price * quantity) DESC) AS country_revenue_ranking
+ FROM order_details 
 								   LEFT JOIN orders 
 										ON order_details.order_id = orders.order_id
 								   LEFT JOIN customers
@@ -87,39 +87,6 @@ FROM (SELECT country
 					 , category_name)
 WHERE category_revenue_ranking <= 3;
 
---- Solution 2: With CTE
-WITH country_ranking AS (SELECT country
-								, RANK() OVER(ORDER BY SUM((1 - discount) * order_details.unit_price * quantity) DESC) AS country_revenue_ranking
-						 FROM order_details 
-						 LEFT JOIN orders 
-							 ON order_details.order_id = orders.order_id
-						 LEFT JOIN customers
-							 ON orders.customer_id = customers.customer_id
-						 GROUP BY country),
-	category_ranking_with_country AS (SELECT country
-										   , category_name
-										   , SUM((1 - discount) * order_details.unit_price * quantity) AS category_revenue
-									       , RANK() OVER(PARTITION BY country ORDER BY SUM((1 - discount) * order_details.unit_price * quantity) DESC) AS category_revenue_ranking
-										FROM order_details 
-										LEFT JOIN orders 
-											ON order_details.order_id = orders.order_id
-										LEFT JOIN customers
-											ON orders.customer_id = customers.customer_id
-										LEFT JOIN products 
-											ON order_details.product_id = products.product_id
-										LEFT JOIN categories
-											ON products.category_id = categories.category_id
-									 GROUP BY country
-										      , category_name)
-SELECT country_ranking.country
-	   , category_name
-	   , category_revenue_ranking
-FROM country_ranking
-LEFT JOIN category_ranking_with_country
-   ON country_ranking.country = category_ranking_with_country.country
-WHERE country_revenue_ranking = 1
-	AND category_revenue_ranking <= 3;
-		
 
 ---- Q6: Who is the customer that orders the most from Northwind? How much revenue they contributed?
 
@@ -173,13 +140,13 @@ FROM a
  
 --- Q8: For the same customer, what proportion of revenue does the customer contribute to the total revenue in each product category?
 WITH revenue_overall AS (SELECT category_name
-						 		, SUM((1 - discount) * order_details.unit_price * quantity) AS total_revenue
-							 FROM order_details 
-							   LEFT JOIN products 
-									ON order_details.product_id = products.product_id
-							   LEFT JOIN categories
-									ON products.category_id = categories.category_id
-						 GROUP BY category_name)
+, SUM((1 - discount) * order_details.unit_price * quantity) AS total_revenue
+FROM order_details 
+LEFT JOIN products 
+ON order_details.product_id = products.product_id
+LEFT JOIN categories
+ON products.category_id = categories.category_id
+GROUP BY category_name)
 SELECT customer_id
 	   , categories.category_name
 	   , SUM((1 - discount) * order_details.unit_price * quantity) AS customer_revenue
